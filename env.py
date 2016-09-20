@@ -3,7 +3,6 @@ import gym
 
 
 class GymGame(mp.Process):
-
     def __init__(self, in_q, out_q, id):
         super().__init__()
         self.in_q = in_q
@@ -19,13 +18,13 @@ class GymGame(mp.Process):
         return observation, reward, done
 
     def reset(self):
-        observation, reward, done, _info  = self.env.reset()
+        observation, reward, done, _info = self.env.reset()
         return observation, reward, done
 
     def run(self):
         obs, reward, done = self.reset()
         self.out_q.put((self.id, obs, reward, done))
-        while(True):
+        while (True):
             msg = self.in_q.get()
             print("%s received %s" % (self.name, msg))
             if msg == 'reset':
@@ -40,8 +39,6 @@ class GymGame(mp.Process):
 
 
 class CartPole(GymGame):
-
     def __init__(self, in_q, out_q, id):
         self.env = gym.make('CartPole-v0')
         super().__init__(in_q, out_q, id)
-
