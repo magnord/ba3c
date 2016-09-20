@@ -1,18 +1,23 @@
+import time
+
 import numpy as np
-import tensorflow as tf
+
 import configuration as C
-import model
 
 
 # The Asynchronous Advantage Actor Critic Algorithm
 class A3C(object):
-    def __init__(self, sess, id, game):
+    def __init__(self, sess, id, game, model):
         self.sess = sess
         self.game = game
         self.id = id
         self.total_steps = 0  # Total steps taken in this A3C instance
+        self.episode_reward = 0.0
         self.action_size = game.env.action_space.n
+        self.model = model
         self.reset()
+        self.start_time = time.time()
+        self.last_episode = 0
 
     def reset(self):
         self.observations = []
@@ -20,18 +25,16 @@ class A3C(object):
         self.values = []
         self.rewards = []
         self.step = 0
-        self.episode_reward = 0.0
 
     def is_training_step(self, done):
-        return self.step == C.MAX_ROLL_OUT or done == True
+        return self.step == C.MAX_ROLL_OUT
 
     def process_observation(self, observation, reward, done):
-
-        pi, v = model.calc_pi_and_v(self.sess, observation)
+        pi, v = self.model.calc_pi_and_v(observation)
+        # print("pi: %s" % pi)
         action = np.random.choice(len(pi), p=pi)
-        self.total_steps += 1
 
-        if len(self.observations) > 0:  # Store reward from last action, not this one
+        if self.step > 0:  # Store reward from last action, not this one
             self.episode_reward += reward
             self.rewards.append(reward)  # np.clip(reward, -1, 1))
 
@@ -51,11 +54,12 @@ class A3C(object):
         self.episode_reward += reward
         self.rewards.append(reward)  # np.clip(reward, -1, 1))
 
+        episode_reward_sofar = self.episode_reward
         if done == True:
             R = 0.0
-            # TODO: print self.episode_reward
+            self.episode_reward = 0.0
         else:
-            R = self.values[-1]  # Bootstrap with value of last observation
+            R = self.model.calc_v(self.observations[-1])[0]  # Bootstrap with value of last observation
 
         self.actions.reverse()
         self.observations.reverse()
@@ -78,6 +82,8 @@ class A3C(object):
             batch_advantages.append(advantage)
             batch_R.append(R)
 
-        model.train(batch_observations, batch_actions, batch_advantages, batch_R)
+        self.model.train(batch_observations, batch_actions, batch_advantages, batch_R)
 
         self.reset()
+
+        return episode_reward_sofar

@@ -1,7 +1,9 @@
 import multiprocessing as mp
-import logging
-import aaac
+import time
+
 import tensorflow as tf
+
+import aaac
 import configuration as C
 
 
@@ -10,11 +12,9 @@ class Trainer(object):
         self.sess = tf.Session(
             config=tf.ConfigProto(log_device_placement=False,
                                   allow_soft_placement=True))
-        init = tf.initialize_all_variables()
-        self.sess.run(init)
-        self.create_workers()
+        self.create_and_start_workers()
 
-    def create_workers(self):
+    def create_and_start_workers(self):
         # Establish communication queues
         in_qs = []
         worker_names = []
@@ -31,32 +31,52 @@ class Trainer(object):
             p = C.GAME(in_q, out_q, i)
             if i == 0:  # Reference to first game process
                 self.game = p
-                print(p.env)
             processes.append(p)
 
+        self.model = C.MODEL(self.sess, self.game)
+
         for i in range(C.NUM_WORKERS):
-            a3c = aaac.A3C(self.sess, i, self.game)
+            a3c = aaac.A3C(self.sess, i, self.game, self.model)
             a3cs.append(a3c)
 
         for p in processes:
             p.start()
 
-        for i in range(C.MAX_FRAMES):
+        action_step = last_action_step = 0
+        start_time = time.time()
+        training_step = 0
+        for i in range(int(C.MAX_STEPS)):
             # Get next incoming observation and reward
             msg = out_q.get()
-            (worker_id, observation, reward, done) = msg
-            print("Trainer received %s, %d from %s" % (observation, reward, worker_names[worker_id]))
+            [worker_id, observation, reward, done] = msg
+            # print("Trainer received %s, %d from %s" % (observation, reward, worker_names[worker_id]))
 
             a3c = a3cs[worker_id]
 
-            if a3c.is_training_step(done):
-                a3c.process_training_step(reward, done)
+            if a3c.is_training_step(done) or done == True:
+                training_step += 1
+                episode_reward = a3c.process_training_step(reward, done)
 
             if done == False:
                 action = a3c.process_observation(observation, reward, done)
+                action_step += 1
+                # print('Trainer send action: %s to %s' % (action, worker_names[worker_id]))
                 in_qs[worker_id].put(action)
-            else:
+            else:  # Episode terminated
                 in_qs[worker_id].put('reset')
+
+                # Statistics
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                if elapsed_time > 10.0:
+                    steps = action_step - last_action_step
+                    last_action_step = action_step
+                    start_time = end_time
+                    print("%7.0d %6.0d Reward: %3d, lr: %0.6f, %5.0d step/s" % (action_step,
+                                                                                training_step,
+                                                                                episode_reward,
+                                                                                self.sess.run(self.model.learning_rate),
+                                                                                steps / elapsed_time))
 
         for i in range(C.NUM_WORKERS):
             in_qs[i].put('stop')
