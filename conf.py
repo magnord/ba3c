@@ -1,0 +1,26 @@
+import env
+import model
+
+NUM_WORKERS = 3
+GAME_NAME = 'Breakout-v0'
+GAME = env.Atari
+MODEL = model.Atari
+ENTROPY_BETA = 0.01
+MAX_ROLL_OUT = 5
+GAMMA = 0.99
+GRAD_CLIP_NORM = 40.0
+INITIAL_LEARNING_RATE = 5e-4
+LEARNING_RATE_DECAY = 0.95
+MAX_STEPS = 2e8
+
+# NUM_WORKERS = 2
+# GAME_NAME = 'CartPole-v0'
+# GAME = env.CartPole
+# MODEL = model.CartPole
+# ENTROPY_BETA = 0.01
+# MAX_ROLL_OUT = 5
+# GAMMA = 0.99
+# GRAD_CLIP_NORM = 40.0
+# INITIAL_LEARNING_RATE = 0.01
+# LEARNING_RATE_DECAY = 0.5
+# MAX_STEPS = 1e5

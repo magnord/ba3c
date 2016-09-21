@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 
-import configuration as C
+import conf as C
 
 
 # The Asynchronous Advantage Actor Critic Algorithm

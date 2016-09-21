@@ -1,13 +1,12 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-import configuration as C
+import conf as C
 
 
 class Model(object):
     def __init__(self, sess, game):
         self.sess = sess
-        self.game = game
         self.action_size = game.env.action_space.n
 
         # Defined in game specifc subclass
@@ -78,7 +77,7 @@ class CartPole(Model):
 
     # Game specific observation and perception model
     def define_pi_and_v(self):
-        with slim.arg_scope([slim.conv2d, slim.fully_connected],
+        with slim.arg_scope([slim.fully_connected],
                             activation_fn=tf.nn.relu,
                             weights_initializer=tf.contrib.layers.xavier_initializer()):  # tf.truncated_normal_initializer(stddev=0.1)):
             self.observation = tf.placeholder(tf.float32, shape=[None, 4], name='observation')
@@ -86,3 +85,23 @@ class CartPole(Model):
             self.pi = tf.nn.softmax(slim.fully_connected(x, self.action_size, activation_fn=None, scope='pi'))
             v0 = slim.fully_connected(x, 1, activation_fn=None, scope='v')
             self.v = tf.reshape(v0, [-1])
+
+
+class Atari(Model):
+    def __init__(self, sess, game):
+        super().__init__(sess, game)
+
+    # Game specific observation and perception model
+    def define_pi_and_v(self):
+        with slim.arg_scope([slim.conv2d],
+                            weights_initializer=tf.contrib.layers.xavier_initializer_conv2d()):
+            with slim.arg_scope([slim.fully_connected],
+                                activation_fn=tf.nn.relu,
+                                weights_initializer=tf.contrib.layers.xavier_initializer()):
+                self.observation = tf.placeholder(tf.float32, shape=[None, 84, 84, 4], name='observation')
+                x = slim.conv2d(self.observation, 16, [8, 8], stride=4, scope='conv1')
+                x = slim.conv2d(x, 32, [4, 4], stride=2, scope='conv2')
+                x = slim.fully_connected(slim.flatten(x), 256, scope='fc1')  # Why flatten needed?
+                self.pi = tf.nn.softmax(slim.fully_connected(x, self.action_size, activation_fn=None, scope='pi'))
+                v0 = slim.fully_connected(x, 1, activation_fn=None, scope='v')
+                self.v = tf.reshape(v0, [-1])

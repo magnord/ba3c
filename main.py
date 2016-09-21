@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 
 import aaac
-import configuration as C
+import conf as C
 
 
 class Trainer(object):
@@ -13,6 +13,9 @@ class Trainer(object):
             config=tf.ConfigProto(log_device_placement=False,
                                   allow_soft_placement=True))
         self.create_and_start_workers()
+        # these variables are set later
+        self.game = None
+        self.model = None
 
     def create_and_start_workers(self):
         # Establish communication queues
@@ -28,11 +31,12 @@ class Trainer(object):
             in_qs.append(in_q)
             name = "Worker-" + str(i)
             worker_names.append(name)
-            p = C.GAME(in_q, out_q, i)
+            p = C.GAME(in_q, out_q, i, C.GAME_NAME)
             if i == 0:  # Reference to first game process
                 self.game = p
             processes.append(p)
 
+        print(self.game)
         self.model = C.MODEL(self.sess, self.game)
 
         for i in range(C.NUM_WORKERS):
